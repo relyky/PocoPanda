@@ -56,11 +56,12 @@ class MainCommand
       using var conn = new SqlConnection(_connStr);
       await conn.OpenAsync();
 
-      GenerateTablePocoCode(conn, outDir); // in dev 暫成拿掉 
-      GenerateProcPocoCode(conn, outDir);
+      //GenerateTablePocoCode(conn, outDir); // in dev 暫成拿掉 
+      //GenerateProcPocoCode(conn, outDir); // in dev 暫成拿掉 
       //GenerateTableValuedFunctionPocoCode
-      //GenerateTableTypePocoCode
-      //GenerateTableToExcel
+      GenerateTableTypePocoCode(conn, outDir);
+
+      //if (_exportExcel) GenerateTableToExcel(conn, outDir);
 
       Console.WriteLine();
       Console.WriteLine("已成功產生 Dapper POCO 程式碼，請檢查輸出目錄。");
@@ -186,6 +187,9 @@ class MainCommand
     });
   }
 
+  /// <summary>
+  /// 叫用 Procedure。有支援TVP。
+  /// </summary>
   void GenerateProcPocoCode(SqlConnection conn, DirectoryInfo outDir)
   {
     Console.WriteLine("================================================================================");
@@ -397,12 +401,104 @@ class MainCommand
       Console.WriteLine(pocoCode.ToString());
     });
   }
+
+  void GenerateTableTypePocoCode(SqlConnection conn, DirectoryInfo outDir)
+  {
+    Console.WriteLine("================================================================================");
+    Console.WriteLine($"#BEGIN {nameof(GenerateTableTypePocoCode)}");
+    var tableList = DBHelper.LoadTableType(conn);
+    tableList.ForEach(table =>
+    {
+      Console.WriteLine("--------------------------------------------------------------------------------");
+      Console.WriteLine($"#TABLE TYPE: {table.TABLE_TYPE_SCHEMA}.{table.TABLE_TYPE_NAME}");
+      StringBuilder pocoCode = new StringBuilder();
+
+      pocoCode.AppendLine($"namespace {_nameSpace}");
+      pocoCode.AppendLine("{");
+      pocoCode.AppendLine("using System;");
+      pocoCode.AppendLine("using System.ComponentModel.DataAnnotations;");
+      pocoCode.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
+      pocoCode.AppendLine();
+
+      pocoCode.AppendLine($"public class {table.TABLE_TYPE_NAME} ");
+      pocoCode.AppendLine("{"); // begin of: Class
+
+      List<TableTypeColumnInfo> columnList = DBHelper.LoadTableTypeColumn(conn, table.TABLE_TYPE_NAME, table.TABLE_TYPE_SCHEMA);
+      columnList.ForEach(col =>
+      {
+        string dataType = DBHelper.MapNetDataType(col.DATA_TYPE);
+        bool isPrimaryKey = false;
+        bool isIdentity = col.IS_IDENTITY == "YES";
+        bool isComputed = false;
+        string nullable = (dataType != "string" && !isPrimaryKey) ? "?" : ""; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
+
+        //# Key & Computed attribute
+        if (isPrimaryKey)
+          pocoCode.AppendLine($"{_indent}[Key]");
+        if (isIdentity)
+          pocoCode.AppendLine($"{_indent}[DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
+        if (isComputed)
+          pocoCode.AppendLine($"{_indent}[DatabaseGenerated(DatabaseGeneratedOption.Computed)]");
+
+        //# Required attribute
+        if (col.IS_NULLABLE == "NO")
+          pocoCode.AppendLine($"{_indent}[Required]");
+
+        pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}");
+      });
+
+      //## 產生Copy函式
+      ///public void Copy(職員基本表 src)
+      ///{
+      ///    this.職員代碼 = src.職員代碼;
+      ///    this.職員姓名 = src.職員姓名;
+      ///    this.狀態 = src.狀態;
+      ///}
+
+      pocoCode.AppendLine();
+      pocoCode.AppendLine($"{_indent}public void Copy({table.TABLE_TYPE_NAME} src)");
+      pocoCode.AppendLine($"{_indent}{{");
+      columnList.ForEach(col =>
+        pocoCode.AppendLine($"{_indent}{_indent}this.{col.COLUMN_NAME} = src.{col.COLUMN_NAME};"));
+      pocoCode.AppendLine($"{_indent}}}"); // end of: Copy
+
+      //## 產生Clone函式
+      ///public 職員基本表 Clone()
+      ///{
+      ///    return new 職員基本表
+      ///    {
+      ///        職員代碼 = this.職員代碼,
+      ///        職員姓名 = this.職員姓名,
+      ///        狀態 = this.狀態
+      ///    };
+      ///}
+
+      pocoCode.AppendLine();
+      pocoCode.AppendLine($"{_indent}public {table.TABLE_TYPE_NAME} Clone()");
+      pocoCode.AppendLine($"{_indent}{{");
+      pocoCode.AppendLine($"{_indent}{_indent}return new {table.TABLE_TYPE_NAME} {{");
+      columnList.ForEach(col =>
+        pocoCode.AppendLine($"{_indent}{_indent}{_indent}{col.COLUMN_NAME} = this.{col.COLUMN_NAME},"));
+      pocoCode.AppendLine($"{_indent}{_indent}}};");
+      pocoCode.AppendLine($"{_indent}}}"); // end of: Clone
+
+      //---------------------
+      pocoCode.AppendLine("}"); // end of: Class
+      pocoCode.AppendLine("}"); // end of: Namespace
+      pocoCode.AppendLine();
+
+      //## 一個 TableType 一個檔案
+      File.WriteAllText(Path.Combine(outDir.FullName, $"{table.TABLE_TYPE_NAME}.cs"), pocoCode.ToString(), encoding: Encoding.UTF8);
+      Console.WriteLine(pocoCode.ToString());
+    });
+  }
 }
 
 //void GenerateXXXXXX(SqlConnection conn, DirectoryInfo outDir)
 //{
 //  Console.WriteLine("================================================================================");
 //  Console.WriteLine($"#BEGIN {nameof(GenerateXXXXXX)}");
+//  StringBuilder pocoCode = new StringBuilder();
 
 //  Console.WriteLine("--------------------------------------------------------------------------------");
 //  Console.WriteLine($"#{table.TABLE_TYPE}: {table.TABLE_CATALOG}.{table.TABLE_SCHEMA}.{table.TABLE_NAME}");

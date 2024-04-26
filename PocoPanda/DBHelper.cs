@@ -138,6 +138,45 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION ASC ";
     return procedureList;
   }
 
+  /// <summary>
+  /// 參考：[Get Column information of a user defined Table Type](https://stackoverflow.com/questions/41904787/get-column-information-of-a-user-defined-table-type)
+  /// </summary>
+  public static List<TableTypeInfo> LoadTableType(SqlConnection conn)
+  {
+    string sql = @"SELECT [TABLE_TYPE_NAME] = T.name, [TABLE_TYPE_SCHEMA] = SCHEMA_NAME(T.schema_id) FROM sys.table_types T ";
+    var tableList = conn.Query<TableTypeInfo>(sql).ToList();
+    return tableList;
+  }
+
+  /// <summary>
+  /// 參考：[Get Column information of a user defined Table Type](https://stackoverflow.com/questions/41904787/get-column-information-of-a-user-defined-table-type)
+  /// </summary>
+  public static List<TableTypeColumnInfo> LoadTableTypeColumn(SqlConnection conn, string tableTypeName, string tableTypeSchema = "dbo")
+  {
+    string sql = @"SELECT [TABLE_TYPE_NAME] = t.name 
+,[TABLE_TYPE_SCHEMA] = s.name
+,[COLUMN_NAME] = c.name
+,[DATA_TYPE] = y.name
+,[ORDINAL_POSITION] = c.column_id
+,[MAX_LENGTH] = c.max_length
+,[PRECISION] = c.precision
+,[IS_IDENTITY] = CASE WHEN c.is_identity = 1 THEN 'YES' ELSE 'NO' END
+,[IS_NULLABLE] = CASE WHEN c.is_nullable = 1 THEN 'YES' ELSE 'NO' END 
+FROM sys.table_types t
+INNER JOIN sys.schemas s on t.schema_id = s.schema_id
+INNER JOIN sys.columns c on c.object_id = t.type_table_object_id
+INNER JOIN sys.types y on y.user_type_id = c.user_type_id
+WHERE t.is_user_defined = 1
+  AND t.is_table_type = 1
+  AND t.name = @tableTypeName
+  AND s.name = @tableTypeSchema
+ORDER BY [ORDINAL_POSITION] ASC ";
+
+    var columnList = conn.Query<TableTypeColumnInfo>(sql, new { tableTypeName, tableTypeSchema }).ToList();
+    return columnList;
+  }
+
+
   static List<ParameterInfo> DoLoadParameterInfo(SqlConnection conn, string SPECIFIC_NAME, string SPECIFIC_SCHEMA, string SPECIFIC_CATALOG)
   {
     string sql2 = @"SELECT SPECIFIC_CATALOG, SPECIFIC_SCHEMA, SPECIFIC_NAME, ORDINAL_POSITION, PARAMETER_NAME
@@ -207,4 +246,23 @@ class RoutineColumnInfo
   public int ORDINAL_POSITION { get; set; }
   public string IS_NULLABLE { get; set; } = default!;
   public string DATA_TYPE { get; set; } = default!;
+}
+
+class TableTypeInfo
+{
+  public string TABLE_TYPE_NAME { get; set; } = default!;
+  public string TABLE_TYPE_SCHEMA { get; set; } = default!;
+}
+
+class TableTypeColumnInfo
+{
+  public string TABLE_TYPE_NAME { get; set; } = default!;
+  public string TABLE_TYPE_SCHEMA { get; set; } = default!;
+  public string COLUMN_NAME { get; set; } = default!;
+  public string DATA_TYPE { get; set; } = default!;
+  public string IS_IDENTITY { get; set; } = default!;
+  public string IS_NULLABLE { get; set; } = default!;
+  public int ORDINAL_POSITION { get; set; }
+  public int MAX_LENGTH { get; set; }
+  public int PRECISION { get; set; }
 }
