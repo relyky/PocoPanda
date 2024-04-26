@@ -56,12 +56,13 @@ class MainCommand
       using var conn = new SqlConnection(_connStr);
       await conn.OpenAsync();
 
-      //GenerateTablePocoCode(conn, outDir); // in dev 暫成拿掉 
-      //GenerateProcPocoCode(conn, outDir); // in dev 暫成拿掉 
+      GenerateTablePocoCode(conn, outDir);
+      GenerateProcPocoCode(conn, outDir);
       GenerateTableValuedFunctionPocoCode(conn, outDir);
-      //GenerateTableTypePocoCode(conn, outDir); // in dev 暫成拿掉 
+      GenerateTableTypePocoCode(conn, outDir);
 
-      //if (_exportExcel) GenerateTableToExcel(conn, outDir); // in dev 暫成拿掉 
+      if (_exportExcel) 
+        GenerateTableToExcel(conn, outDir);
 
       Console.WriteLine();
       Console.WriteLine("已成功產生 Dapper POCO 程式碼，請檢查輸出目錄。");
@@ -138,7 +139,8 @@ class MainCommand
           pocoCode.AppendLine($"{_indent}[Required]");
 
         //# filed
-        pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}");
+        string? defaultString = dataType == "string" ? " = default!;" : null;
+        pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
       });
 
       //## 產生Copy函式
@@ -205,8 +207,8 @@ class MainCommand
       pocoCode.AppendLine("{");
       pocoCode.AppendLine("using System;");
       pocoCode.AppendLine("using System.Collections.Generic;");
-      pocoCode.AppendLine("using System.ComponentModel.DataAnnotations;");
       pocoCode.AppendLine("using Dapper;");
+      pocoCode.AppendLine("using Vista.DbPanda;");
       pocoCode.AppendLine($"using {_sqlClientLibrary};");
       pocoCode.AppendLine();
 
@@ -224,8 +226,9 @@ class MainCommand
         {
           string dataType = DBHelper.MapNetDataType(col.DATA_TYPE);
           string nullable = (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
+          string? defaultString = dataType == "string" ? " = default!;" : null;
 
-          pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}");
+          pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
         });
         pocoCode.AppendLine("}"); // end of: Reslt Column 
       }
@@ -248,7 +251,8 @@ class MainCommand
             : DBHelper.MapNetDataType(arg.DATA_TYPE);
 
           string nullable = (dataType != "string") ? "?" : "";
-          pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)} {{ get; set; }}");
+          string? defaultString = dataType == "string" ? " = default!;" : null;
+          pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)} {{ get; set; }}{defaultString}");
         });
         pocoCode.AppendLine("}"); // end of: Reslt Column 
       }
@@ -271,16 +275,16 @@ class MainCommand
       if (f_NonParam)
       {
         if (f_NonResult) // 無參數無結果
-          pocoCode.AppendLine($"public static int Call{proc.SPECIFIC_NAME}(this SqlConnection conn, SqlTransaction txn = null)");
+          pocoCode.AppendLine($"public static int Call{proc.SPECIFIC_NAME}(this SqlConnection conn, SqlTransaction? txn = null)");
         else // 無參數無結果
-          pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, SqlTransaction txn = null)");
+          pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, SqlTransaction? txn = null)");
       }
       else
       {
         if (f_NonResult) // 有參數無結果
-          pocoCode.AppendLine($"public static int Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, SqlTransaction txn = null)");
+          pocoCode.AppendLine($"public static int Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, SqlTransaction? txn = null)");
         else // 有參數有結果
-          pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, SqlTransaction txn = null)");
+          pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, SqlTransaction? txn = null)");
       }
 
       pocoCode.AppendLine("{"); // begin of: call procedure 
@@ -376,7 +380,7 @@ class MainCommand
         });
 
         // 加入交易
-        pocoCode.AppendLine(", SqlTransaction txn = null)");
+        pocoCode.AppendLine(", SqlTransaction? txn = null)");
         pocoCode.AppendLine("{"); // begin of: call procedure 
 
         pocoCode.AppendLine($"{_indent}var args = new {proc.SPECIFIC_NAME}Args {{");
@@ -392,8 +396,8 @@ class MainCommand
       }
 
       //---------------------
-      pocoCode.AppendLine("} // end of: DBHelperClassExtensions "); // end of: Procedure Instance 
-      pocoCode.AppendLine("} // end of: Namespace"); // end of: Namespace
+      pocoCode.AppendLine("}"); // end of: Procedure Instance 
+      pocoCode.AppendLine("}"); // end of: Namespace
       pocoCode.AppendLine();
 
       //## 一個 Procedure 一個檔案
@@ -444,7 +448,9 @@ class MainCommand
         if (col.IS_NULLABLE == "NO")
           pocoCode.AppendLine($"{_indent}[Required]");
 
-        pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}");
+        //# filed
+        string? defaultString = dataType == "string" ? " = default!;" : null;
+        pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
       });
 
       //## 產生Copy函式
@@ -511,7 +517,6 @@ class MainCommand
       pocoCode.AppendLine("{");
       pocoCode.AppendLine("using System;");
       pocoCode.AppendLine("using System.Collections.Generic;");
-      pocoCode.AppendLine("using System.ComponentModel.DataAnnotations;");
       pocoCode.AppendLine("using Dapper;");
       pocoCode.AppendLine($"using {_sqlClientLibrary};");
       pocoCode.AppendLine();
@@ -528,8 +533,9 @@ class MainCommand
       {
         string dataType = DBHelper.MapNetDataType(col.DATA_TYPE);
         string nullable = (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
+        string? defaultString = dataType == "string" ? " = default!;" : null;
 
-        pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}");
+        pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
       });
       pocoCode.AppendLine("}"); // end of: Reslt Column 
 
@@ -546,8 +552,9 @@ class MainCommand
       {
         string dataType = DBHelper.MapNetDataType(arg.DATA_TYPE);
         string nullable = (dataType != "string") ? "?" : "";
+        string? defaultString = dataType == "string" ? " = default!;" : null;
 
-        pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)} {{ get; set; }}");
+        pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)} {{ get; set; }}{defaultString}");
       });
       pocoCode.AppendLine("}"); // end of: Reslt Column 
 
@@ -565,7 +572,7 @@ class MainCommand
       ///    return dataList;
       ///}
 
-      pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, SqlTransaction txn = null)");
+      pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, SqlTransaction? txn = null)");
       pocoCode.AppendLine("{");
 
       pocoCode.Append($"{_indent}var sql = @\"SELECT * FROM [{proc.SPECIFIC_SCHEMA}].[{proc.SPECIFIC_NAME}](");
@@ -596,7 +603,7 @@ class MainCommand
 
         pocoCode.Append($", {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)}");
       });
-      pocoCode.AppendLine(", SqlTransaction txn = null)");
+      pocoCode.AppendLine(", SqlTransaction? txn = null)");
       pocoCode.AppendLine("{");
       pocoCode.AppendLine($"{_indent}var args = new {{");
       proc.ParamList.ForEach(arg =>
