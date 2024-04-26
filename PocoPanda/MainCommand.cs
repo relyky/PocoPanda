@@ -310,13 +310,17 @@ class MainCommand
       {
         //# 重組輸入參數 args => DynamicParameters
         /// var param = new DynamicParameters();
+        /// if(args.dataList == null) throw new ApplicaationException("args.dataList 不可為NULL。");
         /// param.Add("@dataList", args.dataList.AsDataTable().AsTableValuedParameter(nameof(MyDataTvp));
         /// param.Add("@foo", args.foo);
         pocoCode.AppendLine($"{_indent}var param = new DynamicParameters();");
         proc.ParamList.ForEach(arg =>
         {
           if (arg.IS_TABLE_TYPE == "YES")
+          {
+            pocoCode.AppendLine($"{_indent}if(args.{arg.PARAMETER_NAME.Substring(1)} == null) throw new ApplicationException(\"args.{arg.PARAMETER_NAME.Substring(1)} 不可為NULL。\"); ");
             pocoCode.AppendLine($"{_indent}param.Add(\"{arg.PARAMETER_NAME}\", args.{arg.PARAMETER_NAME.Substring(1)}.AsDataTable().AsTableValuedParameter(nameof({arg.DATA_TYPE}))); ");
+          }
           else
             pocoCode.AppendLine($"{_indent}param.Add(\"{arg.PARAMETER_NAME}\", args.{arg.PARAMETER_NAME.Substring(1)}); ");
         });

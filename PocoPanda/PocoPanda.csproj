@@ -5,8 +5,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <VersionPrefix>0.5.0</VersionPrefix>
+    <VersionSuffix>beta</VersionSuffix>
     <PublishAot>false</PublishAot>
     <InterceptorsPreviewNamespaces>$(InterceptorsPreviewNamespaces);Dapper.AOT</InterceptorsPreviewNamespaces>
+    <PackageLicenseExpression>CC-BY-NC-SA-4.0</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>

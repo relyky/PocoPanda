@@ -197,7 +197,7 @@ public static class DBHelperClassExtensions
   /// BulkInsert/BulkCopy
   /// ref → https://riptutorial.com/dapper/example/21711/bulk-copy
   /// </summary>
-  public static void BulkInsert<TTable>(this SqlConnection conn, IEnumerable<TTable> entityList, int bulkCopyTimeout = 30, int batchSize = 500)
+  public static void BulkInsert<TTable>(this SqlConnection conn, IEnumerable<TTable> entityList, string? tableName = null, int bulkCopyTimeout = 30, int batchSize = 500)
   {
     var tableType = typeof(TTable);
 
@@ -206,29 +206,7 @@ public static class DBHelperClassExtensions
     {
       bulkCopy.BulkCopyTimeout = bulkCopyTimeout;
       bulkCopy.BatchSize = batchSize;
-      bulkCopy.DestinationTableName = tableType.Name;
-      bulkCopy.EnableStreaming = true;
-      using (var dataReader = reader)
-      {
-        bulkCopy.WriteToServer(dataReader);
-      }
-    }
-  }
-
-  /// <summary>
-  /// BulkInsert/BulkCopy
-  /// ref → https://riptutorial.com/dapper/example/21711/bulk-copy
-  /// </summary>
-  public static void BulkInsert<TTable>(this SqlConnection conn, IEnumerable<TTable> entityList, string tableName, int bulkCopyTimeout = 30, int batchSize = 500)
-  {
-    var tableType = typeof(TTable);
-
-    using (IDataReader reader = entityList.GetDataReader())
-    using (var bulkCopy = new SqlBulkCopy(conn))
-    {
-      bulkCopy.BulkCopyTimeout = bulkCopyTimeout;
-      bulkCopy.BatchSize = batchSize;
-      bulkCopy.DestinationTableName = tableName;
+      bulkCopy.DestinationTableName = tableName ?? tableType.Name;
       bulkCopy.EnableStreaming = true;
       using (var dataReader = reader)
       {
@@ -266,7 +244,7 @@ public static class DBHelperClassExtensions
     return dataList;
   }
 
-  public static List<TTable> ExcuteQuery<TTable>(this SqlCommand cmd)
+  public static List<TTable> QueryEx<TTable>(this SqlCommand cmd)
     where TTable : class
   {
     // 執行 SqlCommnad
