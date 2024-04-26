@@ -56,7 +56,7 @@ class MainCommand
       using var conn = new SqlConnection(_connStr);
       await conn.OpenAsync();
 
-      //GenerateTablePocoCode(conn, outDir); // in dev 暫成拿掉 
+      GenerateTablePocoCode(conn, outDir); // in dev 暫成拿掉 
       GenerateProcPocoCode(conn, outDir);
       //GenerateTableValuedFunctionPocoCode
       //GenerateTableTypePocoCode

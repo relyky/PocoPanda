@@ -10,65 +10,40 @@ class DBHelper
   /// </summary>
   public static string MapNetDataType(string sqlDataTypeName)
   {
-    switch (sqlDataTypeName.ToLower())
+    return sqlDataTypeName.ToLower() switch
     {
-      case "bigint":
-        return "Int64";
-      case "binary":
-        return "Byte[]";
-      case "bit":
-        return "bool";
+      "bigint" => "Int64",
+      "binary" => "Byte[]",
+      "bit" => "bool",
       //case "char":
-      case string t when t.StartsWith("char"):
-        return "string";
-      case "cursor":
-        return string.Empty;
-      case "datetime":
-        return "DateTime";
-      case "datetime2":
-        return "DateTime";
-      case "decimal":
-        return "Decimal";
-      case "float":
-        return "Double";
-      case "int":
-        return "int";
-      case "money":
-        return "Decimal";
-      //case "nchar":
-      case string t when t.StartsWith("nchar"):
-        return "string";
-      case "numeric":
-        return "Decimal";
-      //case "nvarchar":
-      case string t when t.StartsWith("nvarchar"):
-        return "string";
-      case "real":
-        return "single";
-      case "smallint":
-        return "Int16";
-      case "text":
-        return "string";
-      case "tinyint":
-        return "Byte";
-      case "varbinary":
-        return "Byte[]";
-      case "xml":
-        return "string";
-      //case "varchar":
-      case string t when t.StartsWith("varchar"):
-        return "string";
-      case "smalldatetime":
-        return "DateTime";
-      case "image":
-        return "byte[]";
-      case "uniqueidentifier":
-        return "Guid";
-      case "datetimeoffset":
-        return "DateTimeOffset";
-      default:
-        return $"{sqlDataTypeName}:not_support"; // not support
-    }
+      string t when t.StartsWith("char") => "string",
+      "cursor" => string.Empty,
+      "datetime" => "DateTime",
+      "datetime2" => "DateTime",
+      //case "decimal(18,4)":
+      string t when t.StartsWith("decimal") => "Decimal",
+      "float" => "Double",
+      "int" => "int",
+      "money" => "Decimal",
+      //case "nchar(50)":
+      string t when t.StartsWith("nchar") => "string",
+      "numeric" => "Decimal",
+      //case "nvarchar(50)":
+      string t when t.StartsWith("nvarchar") => "string",
+      "real" => "single",
+      "smallint" => "Int16",
+      "text" => "string",
+      "tinyint" => "Byte",
+      "varbinary" => "Byte[]",
+      "xml" => "string",
+      //case "varchar(50)":
+      string t when t.StartsWith("varchar") => "string",
+      "smalldatetime" => "DateTime",
+      "image" => "byte[]",
+      "uniqueidentifier" => "Guid",
+      "datetimeoffset" => "DateTimeOffset",
+      _ => $"{sqlDataTypeName}:not_support" // not support
+    };
   }
 
   public static List<TableInfo> LoadTable(SqlConnection conn)
@@ -211,25 +186,25 @@ class RoutineInfo
   public string SPECIFIC_NAME { get; set; } = string.Empty;
   public string ROUTINE_TYPE { get; set; } = string.Empty;
 
-  public List<ParameterInfo> ParamList { get; set; }
-  public List<RoutineColumnInfo> ColumnList { get; set; }
+  public List<ParameterInfo> ParamList { get; set; } = default!;
+  public List<RoutineColumnInfo> ColumnList { get; set; } = default!;
 }
 
 class ParameterInfo
 {
-  public string PARAMETER_NAME { get; set; }
+  public string PARAMETER_NAME { get; set; } = default!;
   public int ORDINAL_POSITION { get; set; }
-  public string SPECIFIC_CATALOG { get; set; }
-  public string SPECIFIC_SCHEMA { get; set; }
-  public string PECIFIC_NAME { get; set; }
-  public string DATA_TYPE { get; set; }
-  public string IS_TABLE_TYPE { get; set; }
+  public string SPECIFIC_CATALOG { get; set; } = default!;
+  public string SPECIFIC_SCHEMA { get; set; } = default!;
+  public string PECIFIC_NAME { get; set; } = default!;
+  public string DATA_TYPE { get; set; } = default!;
+  public string IS_TABLE_TYPE { get; set; } = default!;
 }
 
 class RoutineColumnInfo
 {
-  public string COLUMN_NAME { get; set; }
+  public string COLUMN_NAME { get; set; } = default!;
   public int ORDINAL_POSITION { get; set; }
-  public string IS_NULLABLE { get; set; }
-  public string DATA_TYPE { get; set; }
+  public string IS_NULLABLE { get; set; } = default!;
+  public string DATA_TYPE { get; set; } = default!;
 }
