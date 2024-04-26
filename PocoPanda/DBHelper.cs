@@ -1,10 +1,5 @@
 ﻿using Dapper;
 using Microsoft.Data.SqlClient;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace PocoPanda;
 
@@ -139,6 +134,48 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION ASC ";
     return columnList;
   }
 
+  public static List<RoutineInfo> LoadProcedure(SqlConnection conn)
+  {
+    string sql1 = @"SELECT SPECIFIC_CATALOG, SPECIFIC_SCHEMA, SPECIFIC_NAME, ROUTINE_TYPE
+  FROM INFORMATION_SCHEMA.ROUTINES
+ WHERE ROUTINE_TYPE = 'PROCEDURE'
+   AND ROUTINE_NAME NOT IN('sp_upgraddiagrams','sp_helpdiagrams','sp_helpdiagramdefinition','sp_creatediagram','sp_renamediagram','sp_alterdiagram','sp_dropdiagram'); ";
+
+    List<RoutineInfo> procedureList = new List<RoutineInfo>();
+    foreach (var info in conn.Query<RoutineInfo>(sql1).ToList())
+    {
+      // parameter info
+      info.ParamList = DoLoadParameterInfo(conn, info.SPECIFIC_NAME, info.SPECIFIC_SCHEMA, info.SPECIFIC_CATALOG);
+
+      // result column info
+      info.ColumnList = conn.Query("sp_describe_first_result_set", new { tsql = info.SPECIFIC_NAME },
+          commandType: System.Data.CommandType.StoredProcedure).Select(c => new RoutineColumnInfo
+          {
+            COLUMN_NAME = (string)c.name,
+            ORDINAL_POSITION = (int)c.column_ordinal,
+            IS_NULLABLE = (bool)c.is_nullable ? "YES" : "NO",
+            DATA_TYPE = (string)c.system_type_name
+          }).ToList();
+
+      procedureList.Add(info);
+    }
+
+    return procedureList;
+  }
+
+  static List<ParameterInfo> DoLoadParameterInfo(SqlConnection conn, string SPECIFIC_NAME, string SPECIFIC_SCHEMA, string SPECIFIC_CATALOG)
+  {
+    string sql2 = @"SELECT SPECIFIC_CATALOG, SPECIFIC_SCHEMA, SPECIFIC_NAME, ORDINAL_POSITION, PARAMETER_NAME
+, [DATA_TYPE] = IIF(DATA_TYPE = 'table type', USER_DEFINED_TYPE_NAME, DATA_TYPE)
+, IS_TABLE_TYPE = IIF(DATA_TYPE = 'table type', 'YES', 'NO')
+ FROM INFORMATION_SCHEMA.PARAMETERS
+ WHERE SPECIFIC_NAME = @SPECIFIC_NAME
+  AND SPECIFIC_SCHEMA = @SPECIFIC_SCHEMA
+  AND SPECIFIC_CATALOG = @SPECIFIC_CATALOG; ";
+
+    var paramList = conn.Query<ParameterInfo>(sql2, new { SPECIFIC_NAME, SPECIFIC_SCHEMA, SPECIFIC_CATALOG }).AsList();
+    return paramList;
+  }
 }
 
 record TableInfo
@@ -165,4 +202,34 @@ record ColumnInfo
   public string? MS_Description { get; set; }
   public string IS_COMPUTED { get; set; } = default!;
   public string? COMPUTED_DEFINITION { get; set; }
+}
+
+class RoutineInfo
+{
+  public string SPECIFIC_CATALOG { get; set; } = string.Empty;
+  public string SPECIFIC_SCHEMA { get; set; } = string.Empty;
+  public string SPECIFIC_NAME { get; set; } = string.Empty;
+  public string ROUTINE_TYPE { get; set; } = string.Empty;
+
+  public List<ParameterInfo> ParamList { get; set; }
+  public List<RoutineColumnInfo> ColumnList { get; set; }
+}
+
+class ParameterInfo
+{
+  public string PARAMETER_NAME { get; set; }
+  public int ORDINAL_POSITION { get; set; }
+  public string SPECIFIC_CATALOG { get; set; }
+  public string SPECIFIC_SCHEMA { get; set; }
+  public string PECIFIC_NAME { get; set; }
+  public string DATA_TYPE { get; set; }
+  public string IS_TABLE_TYPE { get; set; }
+}
+
+class RoutineColumnInfo
+{
+  public string COLUMN_NAME { get; set; }
+  public int ORDINAL_POSITION { get; set; }
+  public string IS_NULLABLE { get; set; }
+  public string DATA_TYPE { get; set; }
 }
