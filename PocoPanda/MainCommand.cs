@@ -1,4 +1,5 @@
 ﻿using Cocona;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Collections.Generic;
@@ -33,7 +34,7 @@ class MainCommand
   }
 
   [Command(Description = "SQL Server POCO tool。所有參數均填入 appsettings.json。")]
-  public Task CommandProcedure()
+  public async Task CommandProcedure()
   {
     Console.WriteLine($"#BEGIN {nameof(MainCommand)}");
     Console.WriteLine($"§ 參數");
@@ -44,9 +45,38 @@ class MainCommand
     Console.WriteLine($"產生 Excel：{_exportExcel}");
     Console.WriteLine();
 
+    try
+    {
+      //# 建立輸出目錄
+      DirectoryInfo outDir = new DirectoryInfo(_outputFolder);
+      if (!outDir.Exists) outDir.Create();
 
-    return Task.CompletedTask;
+      //# 開始產生 POCO classes 
+      using var conn = new SqlConnection(_connStr);
+      await conn.OpenAsync();
+
+      GenerateTablePocoCode(conn, outDir);
+      //GenerateProcPocoCode
+      //GenerateTableValuedFunctionPocoCode
+      //GenerateTableTypePocoCode
+      //GenerateTableToExcel
+
+      Console.WriteLine();
+      Console.WriteLine("已成功產生 Dapper POCO 程式碼，請檢查輸出目錄。");
+    }
+    finally
+    {
+#if !DEBUG
+      Console.WriteLine("Press any key to continue.");
+      Console.ReadKey();
+#endif
+    }
   }
 
+  void GenerateTablePocoCode(SqlConnection conn, DirectoryInfo outDir)
+  {
+    Console.WriteLine($"#BEGIN {nameof(GenerateTablePocoCode)}");
 
+
+  }
 }
