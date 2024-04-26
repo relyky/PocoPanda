@@ -176,6 +176,33 @@ ORDER BY [ORDINAL_POSITION] ASC ";
     return columnList;
   }
 
+  public static List<RoutineInfo> LoadTableValuedFunction(SqlConnection conn)
+  {
+    string sql1 = @"SELECT SPECIFIC_CATALOG, SPECIFIC_SCHEMA, SPECIFIC_NAME, ROUTINE_TYPE
+ FROM INFORMATION_SCHEMA.ROUTINES
+ WHERE ROUTINE_TYPE = 'FUNCTION'
+  AND DATA_TYPE = 'TABLE'; ";
+
+    string sql3 = @"SELECT COLUMN_NAME ,ORDINAL_POSITION ,DATA_TYPE,IS_NULLABLE 
+ FROM INFORMATION_SCHEMA.ROUTINE_COLUMNS
+ WHERE TABLE_NAME = @SPECIFIC_NAME
+  AND TABLE_SCHEMA = @SPECIFIC_SCHEMA
+  AND TABLE_CATALOG = @SPECIFIC_CATALOG; ";
+
+    List<RoutineInfo> procedureList = new List<RoutineInfo>();
+    foreach (var info in conn.Query<RoutineInfo>(sql1).ToList())
+    {
+      // parameter info
+      info.ParamList = DoLoadParameterInfo(conn, info.SPECIFIC_NAME, info.SPECIFIC_SCHEMA, info.SPECIFIC_CATALOG);
+
+      // result column info
+      info.ColumnList = conn.Query<RoutineColumnInfo>(sql3, new { info.SPECIFIC_CATALOG, info.SPECIFIC_SCHEMA, info.SPECIFIC_NAME }).ToList();
+
+      procedureList.Add(info);
+    }
+
+    return procedureList;
+  }
 
   static List<ParameterInfo> DoLoadParameterInfo(SqlConnection conn, string SPECIFIC_NAME, string SPECIFIC_SCHEMA, string SPECIFIC_CATALOG)
   {
