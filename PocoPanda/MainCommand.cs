@@ -410,6 +410,9 @@ class MainCommand
     });
   }
 
+  /// <summary>
+  /// 產生 TVP 類別。
+  /// </summary>
   void GenerateTableTypePocoCode(SqlConnection conn, DirectoryInfo outDir)
   {
     Console.WriteLine("================================================================================");

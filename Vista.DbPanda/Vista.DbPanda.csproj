@@ -4,6 +4,8 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Version>0.9.1.1</Version>
+    <PackageLicenseExpression>CC-BY-NC-ND-4.0</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
