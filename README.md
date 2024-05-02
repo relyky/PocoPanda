@@ -1,2 +1,2 @@
 # PocoPanda
- SQL Server POCO tool
+ SQL Server POCO tool for Dapper
