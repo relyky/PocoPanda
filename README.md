@@ -1,2 +1,2 @@
 # PocoPanda
- SQL Server POCO tool for Dapper
+SQL Server 2019+ POCO tool for Dapper.
