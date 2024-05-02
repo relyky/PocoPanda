@@ -39,6 +39,7 @@ public static class DBHelperClassExtensions
   /// <summary>
   /// DBHelper: 取代 Dapper.Contrib 之 Get 指令無法多 p-key 取值的狀況
   /// </summary>
+  /// <param name="keys">P-Keys。用Anonymous Type 指定。</param>
   public static TTable GetEx<TTable>(this SqlConnection conn, object keys, SqlTransaction txn = null)
   {
     // 依 Property 動態加入 P-Key 查詢條件
@@ -57,6 +58,7 @@ public static class DBHelperClassExtensions
   /// <summary>
   /// DBHelper: 載入多筆資料。設計用於取主檔下的多筆明細資料。與GetEx相比可以取回多筆資料。
   /// </summary>
+  /// <param name="keys">P-Keys。用Anonymous Type 指定。</param>
   public static List<TTable> LoadEx<TTable>(this SqlConnection conn, object keys, SqlTransaction txn = null)
   {
     // 依 Property 動態加入 P-Key 查詢條件
@@ -78,6 +80,7 @@ public static class DBHelperClassExtensions
   /// <summary>
   /// DBHelper: 可刪除多筆資料。
   /// </summary>
+  /// <param name="keys">P-Keys。用Anonymous Type 指定。</param>
   public static int DeleteEx<TTable>(this SqlConnection conn, object keys, SqlTransaction txn = null)
   {
     // 依 Property 動態加入 P-Key 查詢條件
@@ -97,8 +100,8 @@ public static class DBHelperClassExtensions
   /// DBHelper: UPDATE TABLE。為了一種經常性的應用：標記已刪除等。或只更一筆資料中的幾個（二、三個）欄位。
   /// ※注意：不可用於更新P-Key的值。
   /// </summary>
-  /// <param name="newValues">新的值，請用Anonymous Type。</param>
-  /// <param name="keys">P-Keys，請用Anonymous Type。</param>
+  /// <param name="newValues">新的值。用Anonymous Type 指定。</param>
+  /// <param name="keys">P-Keys。用Anonymous Type 指定。</param>
   /// <returns>updCount，更新筆數。</returns>
   public static int UpdateEx<TTable>(this SqlConnection conn, object newValues, object keys, SqlTransaction txn = null)
   {
