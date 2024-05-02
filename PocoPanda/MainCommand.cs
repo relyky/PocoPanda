@@ -1,6 +1,9 @@
-﻿using Cocona;
+﻿using ClosedXML.Excel;
+using ClosedXML.Report;
+using Cocona;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using PocoPanda.Models;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -642,16 +645,86 @@ class MainCommand
     Console.WriteLine("================================================================================");
     Console.WriteLine($"#BEGIN {nameof(GenerateTableToExcel)}");
 
-    Console.WriteLine("未實作匯出 Excel。");
+    // 以 Excel 範本為基礎
+    using var workbook = new XLWorkbook(@"Template/Template_Overview.xlsx");
+
+    var tableList = DBHelper.LoadTable(conn);
+
+    #region 資料庫檔案(物件)總覽
+
+    OverviewInfo overview = new()
+    {
+      DbName = conn.Database,
+      PrintDate = $"{DateTime.Now:yyyy-MM-dd}",
+      ItemList = tableList.Select((c, idx) => new OverviewItem
+      {
+        Sn = $"{idx}",
+        Name = c.TABLE_NAME,
+        Desc = "",
+        Type = c.TABLE_TYPE
+      }).ToList()
+    };
+
+    using var overviewTpl = new XLTemplate(@"Template/Template_Overview.xlsx");
+    overviewTpl.AddVariable(overview);
+    overviewTpl.Generate();
+
+    //overviewTpl.SaveAs(fi.FullName);
+    workbook.Worksheet("Overview").Delete();
+    overviewTpl.Workbook.Worksheet(1).CopyTo(workbook, "Overview");
+
+    #endregion 資料庫檔案(物件)總覽
+
+    #region 一一加入資料庫檔案(物件)明細
+    tableList.ForEach(table =>
+    {
+      //## 一個 Table 一個 sheet
+      List<ColumnInfo> columnList = DBHelper.LoadTableColumn(conn, table.TABLE_NAME);
+
+      RptTableInfo tableInfo = new RptTableInfo
+      {
+        Name = table.TABLE_NAME,
+        Type = table.TABLE_TYPE,
+        PrintDate = $"{DateTime.Now:yyyy-MM-dd}",
+        FieldList = columnList.Select((c, idx) => new RptTableField
+        {
+          Sn = c.ORDINAL_POSITION,
+          Name = c.COLUMN_NAME,
+          Cname = c.MS_Description?.Split(':', '：', '\r', '\n')[0].Trim(),
+          Type = c.DATA_TYPE,
+          Len = "-1".Equals(c.CHARACTER_MAXIMUM_LENGTH) ? "MAX" : c.CHARACTER_MAXIMUM_LENGTH,
+          Pk = "YES".Equals(c.IS_PK) ? "pk" : "",
+          Default = c.COLUMN_DEFAULT,
+          Nullable = c.IS_NULLABLE,
+          Desc = c.MS_Description,
+        }).ToList()
+      };
+
+      using var tableTpl = new XLTemplate(@"Template/Template_Table.xlsx");
+      tableTpl.AddVariable(tableInfo);
+      tableTpl.Generate();
+      tableTpl.Workbook.Worksheet(1).CopyTo(workbook, table.TABLE_NAME);
+    });
+    #endregion
+
+    //# 為 Overview Sheet 的項目加入 hyper-link 連結到明細
+    IXLWorksheet overSheet = workbook.Worksheet("Overview");
+    var lastRowNum = overSheet.LastRowUsed().RowNumber();
+
+    var activeRow = overSheet.Row(6);
+    while(lastRowNum >= activeRow.RowNumber())
+    {
+      var link = activeRow.Cell(2).CreateHyperlink();
+      link.InternalAddress = $"{activeRow.Cell(2).Value}!A1"; // 連結到自己的明細
+      // next
+      activeRow = activeRow.RowBelow();
+    }
+
+    //# 成功存檔
+    var fi = new FileInfo(Path.Combine(outDir.FullName, $"{conn.Database}_Schema.xlsx"));
+    if (fi.Exists) fi.Delete();
+    workbook.SaveAs(fi.FullName);
+
+    Console.WriteLine("已匯出 Excel。");
   }
 }
-
-//void GenerateXXXXXX(SqlConnection conn, DirectoryInfo outDir)
-//{
-//  Console.WriteLine("================================================================================");
-//  Console.WriteLine($"#BEGIN {nameof(GenerateXXXXXX)}");
-
-//  StringBuilder pocoCode = new StringBuilder();
-//  Console.WriteLine("--------------------------------------------------------------------------------");
-//  Console.WriteLine($"#{table.TABLE_TYPE}: {table.TABLE_CATALOG}.{table.TABLE_SCHEMA}.{table.TABLE_NAME}");
-//}

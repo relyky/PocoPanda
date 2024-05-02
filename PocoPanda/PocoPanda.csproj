@@ -5,7 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <VersionPrefix>0.5.0</VersionPrefix>
+    <VersionPrefix>0.9.1</VersionPrefix>
     <VersionSuffix>beta</VersionSuffix>
     <PackageLicenseExpression>CC-BY-NC-SA-4.0</PackageLicenseExpression>
     <PublishAot>false</PublishAot>
@@ -13,6 +13,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="Template\Template_Overview.xlsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Template\Template_Table.xlsx">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML.Report" Version="0.2.10" />
     <PackageReference Include="Cocona" Version="2.2.0" />
     <PackageReference Include="Dapper" Version="2.1.35" />
     <PackageReference Include="Dapper.AOT" Version="1.0.31" />
