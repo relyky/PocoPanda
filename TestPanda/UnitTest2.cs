@@ -68,4 +68,45 @@ public class UnitTest2 : TestBase
     Assert.IsTrue(delCnt > 0);
   }
 
+  [TestMethod("資料庫單筆以物件 INSERT,UPDATE,DELETE")]
+  public void TestMethod3()
+  {
+    var connString = Configuration.GetConnectionString("DefaultConnection");
+    Assert.IsNotNull(connString);
+    var proxy = new ConnProxy(connString);
+    using var conn = proxy.Open();
+
+    //# 新增一筆
+    MyData newData = new MyData
+    {
+      SN = 0,
+      IDN = "A010009",
+      Title = "今天天氣真好",
+      Amount = (decimal?)987.1234,
+      Birthday = DateTime.Today,
+      Remark = "來自測試專案"
+    };
+
+    long newId = conn.InsertEx(newData);
+    Assert.IsTrue(newId > 0L);
+    newData.SN = newId;
+
+    //# 更新該筆
+    newData.Amount = (decimal?)9999.8888;
+    newData.Birthday = DateTime.Today.AddDays(-1);
+    int updCnt = conn.UpdateEx(newData);
+    Assert.AreEqual(1, updCnt);
+
+    var info = conn.GetEx<MyData>(new { SN = newId });
+    Assert.IsNotNull(info);
+    Assert.AreEqual(newData.SN, info.SN);
+    Assert.AreEqual(newData.Amount, info.Amount);
+    Assert.AreEqual(newData.Birthday, info.Birthday);
+
+    //# 刪除
+    int delCnt = conn.DeleteEx(newData);
+    Assert.IsTrue(delCnt > 0);
+    var info2 = conn.GetEx<MyData>(new { SN = newId });
+    Assert.IsNull(info2);
+  }
 }

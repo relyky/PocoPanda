@@ -7,7 +7,7 @@ using System.Reflection;
 using System.Text;
 
 /***************************************************************************
-第三版 DBHelper.v３.0 on 2023-1-18
+第三版 DBHelper.v３.1 on 2024-5-2
 參考相依：Vista.Models.GenericListDataReader 類別。
 ***************************************************************************/
 
@@ -81,7 +81,7 @@ public static class DBHelperClassExtensions
   /// DBHelper: 可刪除多筆資料。
   /// </summary>
   /// <param name="keys">P-Keys。用Anonymous Type 指定。</param>
-  public static int DeleteEx<TTable>(this SqlConnection conn, object keys, SqlTransaction txn = null)
+  public static int DeleteEx<TTable>(this SqlConnection conn, object keys, SqlTransaction? txn = null)
   {
     // 依 Property 動態加入 P-Key 查詢條件
     List<String> conds = new List<string>();
@@ -93,6 +93,35 @@ public static class DBHelperClassExtensions
     String tableName = typeof(TTable).Name;
     StringBuilder sql = new StringBuilder($@"DELETE FROM {tableName} WHERE {String.Join("AND ", conds)}; ");
     int ret = conn.Execute(sql.ToString(), keys, txn);
+    return ret;
+  }
+
+  /// <summary>
+  /// DBHelper: 刪除一筆資料。
+  /// 依 P-Keys 刪除。不可用於無 P-Key 的 Table。
+  /// </summary>
+  public static int DeleteEx<TTable>(this SqlConnection conn, TTable entity, SqlTransaction? txn = null)
+  {
+    //# 取得 P-Keys
+    var tableType = typeof(TTable);
+    String tableName = tableType.Name;
+    var tableProps = tableType.GetProperties();
+    PropertyInfo[] pkeys = tableProps.Where(p => p.GetCustomAttributes(true).Any(attr => attr is KeyAttribute)).ToArray();
+    if (pkeys.Length <= 0)
+      throw new ApplicationException($"此資料檔 {tableName} 無 p-key。不支援無條件刪除。");
+
+    // 動態加入 P-Key 查詢條件
+    List<String> conds = new List<string>();
+    DynamicParameters args = new DynamicParameters();
+    foreach (PropertyInfo pi in pkeys)
+    {
+      conds.Add($"{pi.Name} = @{pi.Name} ");
+      args.Add(pi.Name, pi.GetValue(entity));
+    }
+
+    // To execute 
+    string sql = $@"DELETE FROM {tableName} WHERE {String.Join("AND ", conds)}; ";
+    int ret = conn.Execute(new CommandDefinition(sql, args, txn));
     return ret;
   }
 
@@ -133,9 +162,55 @@ public static class DBHelperClassExtensions
       param.Add(pi.Name, pi.GetValue(keys));
     }
 
+    //# To execute 
     String tableName = typeof(TTable).Name;
     StringBuilder sql = new StringBuilder($@"UPDATE {tableName} SET {String.Join(", ", fields)} WHERE {String.Join("AND ", conds)}; ");
     int updCount = conn.Execute(sql.ToString(), param, txn);
+    return updCount;
+  }
+
+  /// <summary>
+  /// DBHelper: 更新一筆資料。
+  /// 依 P-Keys 更新。不可用於無 P-Key 的 Table。
+  /// </summary>
+  public static int UpdateEx<TTable>(this SqlConnection conn, TTable entity, SqlTransaction? txn = null)
+  {
+    //# 取得 P-Keys
+    var tableType = typeof(TTable);
+    String tableName = tableType.Name;
+    PropertyInfo[] tableProps = tableType.GetProperties();
+    PropertyInfo[] pkeys = tableProps.Where(p => p.GetCustomAttributes(true).Any(attr => attr is KeyAttribute)).ToArray();
+    if (pkeys.Length <= 0)
+      throw new ApplicationException($"此資料檔 {tableName} 無 p-key。不支援無條件刪除。");
+
+    //# 取出無法更新的欄位，如：identity 與 Computed field。
+    /// 它們都是 DatabaseGeneratedAttribute。
+    PropertyInfo[] skipProperties = tableProps.Where(p => p.GetCustomAttributes(true).Any(a => a is DatabaseGeneratedAttribute)).ToArray();
+
+    //# 排除 tableProps 無法更新的欄位
+    tableProps = tableProps.Except(skipProperties).Except(pkeys).ToArray();
+
+    //# 依 tableProps 動態加入更新欄位
+    DynamicParameters param = new DynamicParameters();
+    List<String> fields = new List<string>();
+    foreach (PropertyInfo pi in tableProps)
+    {
+      //# 加入更新欄位
+      fields.Add($"{pi.Name} = @{pi.Name} ");
+      param.Add(pi.Name, pi.GetValue(entity));
+    }
+
+    //# 組織查詢條件: 動態加入 P-Key 
+    List<String> conds = new List<string>();
+    foreach (PropertyInfo pi in pkeys)
+    {
+      conds.Add($"{pi.Name} = @{pi.Name} ");
+      param.Add(pi.Name, pi.GetValue(entity));
+    }
+
+    //# To execute 
+    string sql = $@"UPDATE {tableName} SET {String.Join(", ", fields)} WHERE {String.Join("AND ", conds)}; ";
+    int updCount = conn.Execute(new CommandDefinition(sql, param, txn));
     return updCount;
   }
 
