@@ -52,4 +52,31 @@ public class UnitTest4 : TestBase
     int delCnt = conn.Execute(purgeSql);
     Assert.AreEqual(10, delCnt);
   }
+
+  [TestMethod("測試 View: vwTestView")]
+  public void TestMethod3()
+  {
+    var connString = Configuration.GetConnectionString("DefaultConnection");
+    Assert.IsNotNull(connString);
+    var proxy = new ConnProxy(connString);
+    using var conn = proxy.Open();
+
+    //------
+    string sql = "SELECT * FROM vwTestView ";
+    var dataList = conn.QueryEx<vwTestView>(sql);
+    Assert.IsTrue(dataList.Count > 10);
+  }
+
+  [TestMethod("測試 View Function: vwMyData")]
+  public void TestMethod4()
+  {
+    var connString = Configuration.GetConnectionString("DefaultConnection");
+    Assert.IsNotNull(connString);
+    var proxy = new ConnProxy(connString);
+    using var conn = proxy.Open();
+
+    //------
+    List<vwMyDataResult> dataList = conn.CallvwMyData("今天天氣真好", 1000);
+    Assert.IsTrue(dataList.Count > 10);
+  }
 }
