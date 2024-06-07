@@ -670,8 +670,8 @@ class MainCommand
     overviewTpl.Generate();
 
     //overviewTpl.SaveAs(fi.FullName);
-    workbook.Worksheet("Overview").Delete();
-    overviewTpl.Workbook.Worksheet(1).CopyTo(workbook, "Overview");
+    workbook.Worksheet("Schema Overview").Delete();
+    overviewTpl.Workbook.Worksheet(1).CopyTo(workbook, "Schema Overview");
 
     #endregion 資料庫檔案(物件)總覽
 
@@ -708,7 +708,7 @@ class MainCommand
     #endregion
 
     //# 為 Overview Sheet 的項目加入 hyper-link 連結到明細
-    IXLWorksheet overSheet = workbook.Worksheet("Overview");
+    IXLWorksheet overSheet = workbook.Worksheet("Schema Overview");
     var lastRowNum = overSheet.LastRowUsed().RowNumber();
 
     var activeRow = overSheet.Row(6);
