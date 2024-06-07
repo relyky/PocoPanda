@@ -12,7 +12,9 @@ public class vwMyDataResult
   public string Title { get; set; } = default!;
   public Decimal Amount { get; set; }
   public DateTime? Birthday { get; set; }
+  public TimeSpan? WakeTime { get; set; }
   public string Remark { get; set; } = default!;
+  public DateTime? LogDtm { get; set; }
 }
 
 public class vwMyDataArgs 

@@ -17,7 +17,9 @@ public class UnitTest2 : TestBase
     using var conn = proxy.Open();
 
     string sql = @"SELECT * FROM MyData WHERE IDN = @IDN";
-    var dataList = conn.Query<MyData>(sql, new { IDN = "A003003" }).AsList();
+    var rawList = conn.Query(sql, new { IDN = "A003003" }).AsList();
+
+    List<MyData> dataList = conn.Query<MyData>(sql, new { IDN = "A003003" }).AsList();
     Assert.IsNotNull(dataList);
     Assert.AreEqual(5, dataList.Count, "預計取出 5 筆");
     var info = dataList[0];
@@ -41,7 +43,9 @@ public class UnitTest2 : TestBase
       Title = "今天天氣真好",
       Amount = (decimal?)987.1234,
       Birthday = DateTime.Today,
-      Remark = "來自測試專案"
+      WakeTime = new TimeSpan(23, 1, 2),
+      Remark = "來自測試專案",
+      LogDtm = DateTime.Now
     };
 
     long newId = conn.InsertEx(newData);
@@ -51,10 +55,12 @@ public class UnitTest2 : TestBase
     var info = conn.GetEx<MyData>(new { SN = newId });
     Assert.IsNotNull(info);
     Assert.AreEqual(DateTime.Today, info.Birthday);
+    Assert.AreEqual(new TimeSpan(23, 1, 2), info.WakeTime);
 
     //# 更新該筆
     info.Amount = (decimal?)9999.8888;
     info.Birthday = DateTime.Today.AddDays(-1);
+    info.WakeTime = new TimeSpan(12, 13, 14);
     int updCnt = conn.UpdateEx<MyData>(info, new { info.SN });
     Assert.AreEqual(1, updCnt);
 
@@ -62,6 +68,7 @@ public class UnitTest2 : TestBase
     Assert.IsNotNull(updInfo);
     Assert.AreEqual(info.Amount, updInfo.Amount);
     Assert.AreEqual(info.Birthday, updInfo.Birthday);
+    Assert.AreEqual(info.WakeTime, updInfo.WakeTime);
 
     //# 刪除
     int delCnt = conn.DeleteEx<MyData>(new { updInfo.IDN });

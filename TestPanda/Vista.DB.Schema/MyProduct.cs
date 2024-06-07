@@ -4,6 +4,9 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
+/// <summary>
+/// 測試產品
+/// </summary>
 [Table("MyProduct")]
 public class MyProduct 
 {
