@@ -4,13 +4,8 @@ using Cocona;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using PocoPanda.Models;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace PocoPanda;
 
@@ -96,6 +91,14 @@ class MainCommand
       pocoCode.AppendLine("using System.ComponentModel.DataAnnotations;");
       pocoCode.AppendLine("using System.ComponentModel.DataAnnotations.Schema;");
       pocoCode.AppendLine();
+
+      //# summary 
+      if(table.MS_Description != null)
+      {
+        pocoCode.AppendLine($"/// <summary>");
+        pocoCode.AppendLine($"/// {table.MS_Description}");
+        pocoCode.AppendLine($"/// </summary>");
+      }
 
       pocoCode.AppendLine($"[Table(\"{table.TABLE_NAME}\")]");
       pocoCode.AppendLine($"public class {table.TABLE_NAME} ");
@@ -660,7 +663,7 @@ class MainCommand
       {
         Sn = $"{idx}",
         Name = c.TABLE_NAME,
-        Desc = "",
+        Desc = c.MS_Description,
         Type = c.TABLE_TYPE
       }).ToList()
     };
@@ -685,6 +688,7 @@ class MainCommand
       {
         Name = table.TABLE_NAME,
         Type = table.TABLE_TYPE,
+        Desc = table.MS_Description,
         PrintDate = $"{DateTime.Now:yyyy-MM-dd}",
         FieldList = columnList.Select((c, idx) => new RptTableField
         {

@@ -48,7 +48,23 @@ class DBHelper
 
   public static List<TableInfo> LoadTable(SqlConnection conn)
   {
-    string sql = @"SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME != 'sysdiagrams' ";
+    //string sql = @"SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME != 'sysdiagrams' ";
+    string sql = """
+WITH MSDESC AS (
+select ss.name [TABLE_SCHEMA], st.name [TABLE_NAME], sep.value [MS_Description]
+from sys.tables st
+inner join sys.schemas ss on st.schema_id = ss.schema_id 
+inner join sys.extended_properties sep on 
+  st.object_id = sep.major_id and 
+  sep.minor_id = 0 and
+  sep.name = 'MS_Description' and 
+  sep.value is not null
+)
+SELECT T.*, MSDESC.[MS_Description]
+ FROM INFORMATION_SCHEMA.TABLES T
+ LEFT JOIN MSDESC ON T.TABLE_SCHEMA = MSDESC.TABLE_SCHEMA AND T.TABLE_NAME = MSDESC.TABLE_NAME
+ WHERE T.TABLE_NAME != 'sysdiagrams'
+""";
     var tableList = conn.Query<TableInfo>(sql).ToList();
     return tableList;
   }
@@ -225,6 +241,7 @@ record TableInfo
   public string TABLE_SCHEMA { get; set; } = default!;
   public string TABLE_NAME { get; set; } = default!;
   public string TABLE_TYPE { get; set; } = default!;
+  public string MS_Description { get; set; } = default!;
 }
 
 record ColumnInfo

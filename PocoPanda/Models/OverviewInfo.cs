@@ -20,6 +20,7 @@ internal class RptTableInfo
 {
   public string Name { get; set; } = default!;
   public string Type { get; set; } = default!;
+  public string Desc { get; set; } = default!;
   public string PrintDate { get; set; } = default!;
   public List<RptTableField> FieldList { get; set; } = default!;
 }
