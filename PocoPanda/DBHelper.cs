@@ -42,6 +42,8 @@ class DBHelper
       "image" => "byte[]",
       "uniqueidentifier" => "Guid",
       "datetimeoffset" => "DateTimeOffset",
+      "date" => "DateTime",
+      "time" => "TimeSpan",
       _ => $"{sqlDataTypeName}:not_support" // not support
     };
   }
