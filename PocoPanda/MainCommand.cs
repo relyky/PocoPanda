@@ -20,7 +20,26 @@ class MainCommand
   readonly string _outputFolder;
   readonly bool _exportExcel;
   readonly string _indent = "  ";
-  readonly string _sqlClientLibrary = "Microsoft.Data.SqlClient";
+
+  /// <summary>
+  /// "Microsoft.Data.SqlClient" OR "System.Data.SqlClient"
+  /// </summary>
+  readonly string _sqlClientLibrary;
+
+  /// <summary>
+  /// 把 Talbe 與 View 的 class name 串上'Info' 以避免衝突欄位名稱。
+  /// </summary>
+  readonly bool _nameInfo;
+
+  /// <summary>
+  /// 欄位定義加入 '= default!'。預設:true. 
+  /// </summary>
+  readonly bool _fieldWithDefault;
+
+  /// <summary>
+  /// .NET Framework 4.8 只支援到 C# 7.3 版的語言限制。
+  /// </summary>
+  readonly bool _cs73Limit;
 
   [RequiresUnreferencedCode("Calls Microsoft.Extensions.Configuration.ConfigurationBinder.GetValue<T>(String, T)")]
   public MainCommand(IConfiguration config)
@@ -30,6 +49,10 @@ class MainCommand
     _nameSpace = config["Namespace"];
     _outputFolder = config["OutputFolder"];
     _exportExcel = config.GetValue<bool>("ExportExcel", false);
+    _sqlClientLibrary = config.GetValue<string>("SqlClientLibrary", "Microsoft.Data.SqlClient");
+    _nameInfo = config.GetValue<bool>("NameInfo", false);
+    _fieldWithDefault = config.GetValue<bool>("FieldWithDefault", true);
+    _cs73Limit = config.GetValue<bool>("CS73Limit", false);
   }
 
   [Command(Description = "SQL Server POCO tool。所有參數均填入 appsettings.json。")]
@@ -42,6 +65,9 @@ class MainCommand
     Console.WriteLine($"命名空間：{_nameSpace}");
     Console.WriteLine($"SqlClient 套件：{_sqlClientLibrary}");
     Console.WriteLine($"產生 Excel：{_exportExcel}");
+    Console.WriteLine($"類別名稱串 Info：{_nameInfo}");
+    Console.WriteLine($"欄位宣告有 defautl：{_fieldWithDefault}");
+    Console.WriteLine($"C# 7.3 限制：{_cs73Limit}");
     Console.WriteLine();
 
     try
@@ -74,11 +100,14 @@ class MainCommand
     }
   }
 
+  /// <summary>
+  /// Table & View
+  /// </summary>
   void GenerateTablePocoCode(SqlConnection conn, DirectoryInfo outDir)
   {
     Console.WriteLine("================================================================================");
     Console.WriteLine($"#BEGIN {nameof(GenerateTablePocoCode)}");
-    var tableList = DBHelper.LoadTable(conn);
+    var tableList = DBHelper.LoadTable(conn); 
     tableList.ForEach(table =>
     {
       Console.WriteLine("--------------------------------------------------------------------------------");
@@ -100,8 +129,12 @@ class MainCommand
         pocoCode.AppendLine($"/// </summary>");
       }
 
+      string tableClassName = _nameInfo
+        ? $"{table.TABLE_NAME}Info"
+        : table.TABLE_NAME;
+
       pocoCode.AppendLine($"[Table(\"{table.TABLE_NAME}\")]");
-      pocoCode.AppendLine($"public class {table.TABLE_NAME} ");
+      pocoCode.AppendLine($"public class {tableClassName} ");
       pocoCode.AppendLine("{");
       //---------------------
       var columnList = DBHelper.LoadTableColumn(conn, table.TABLE_NAME, table.TABLE_SCHEMA);
@@ -111,7 +144,7 @@ class MainCommand
         bool isPrimaryKey = col.IS_PK == "YES";
         bool isIdentity = col.IS_IDENTITY == "YES";
         bool isComputed = col.IS_COMPUTED == "YES";
-        string nullable = (dataType != "string" && !isPrimaryKey) ? "?" : string.Empty; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
+        string nullable = DetermineNullable("YES", dataType, isPrimaryKey); // (dataType != "string" && !isPrimaryKey) ? "?" : string.Empty; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
         string description = col.MS_Description ?? string.Empty;
 
         //# summary
@@ -145,7 +178,7 @@ class MainCommand
           pocoCode.AppendLine($"{_indent}[Required]");
 
         //# filed
-        string? defaultString = dataType == "string" ? " = default!;" : null;
+        string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
         pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
       });
 
@@ -158,7 +191,7 @@ class MainCommand
       ///}
 
       pocoCode.AppendLine();
-      pocoCode.AppendLine($"{_indent}public void Copy({table.TABLE_NAME} src)");
+      pocoCode.AppendLine($"{_indent}public void Copy({tableClassName} src)");
       pocoCode.AppendLine($"{_indent}{{");
       columnList.ForEach(col =>
                 pocoCode.AppendLine($"{_indent}{_indent}this.{col.COLUMN_NAME} = src.{col.COLUMN_NAME};"));
@@ -176,9 +209,9 @@ class MainCommand
       ///}
 
       pocoCode.AppendLine();
-      pocoCode.AppendLine($"{_indent}public {table.TABLE_NAME} Clone()");
+      pocoCode.AppendLine($"{_indent}public {tableClassName} Clone()");
       pocoCode.AppendLine($"{_indent}{{");
-      pocoCode.AppendLine($"{_indent}{_indent}return new {table.TABLE_NAME} {{");
+      pocoCode.AppendLine($"{_indent}{_indent}return new {tableClassName} {{");
       columnList.ForEach(col =>
                 pocoCode.AppendLine($"{_indent}{_indent}{_indent}{col.COLUMN_NAME} = this.{col.COLUMN_NAME},"));
       pocoCode.AppendLine($"{_indent}{_indent}}};");
@@ -231,8 +264,8 @@ class MainCommand
         proc.ColumnList.ForEach(col =>
         {
           string dataType = DBHelper.MapNetDataType(col.DATA_TYPE);
-          string nullable = (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
-          string? defaultString = dataType == "string" ? " = default!;" : null;
+          string nullable = DetermineNullable(col.IS_NULLABLE, dataType, false); // (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
+          string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
 
           pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
         });
@@ -256,8 +289,8 @@ class MainCommand
             ? $"List<{arg.DATA_TYPE}>"
             : DBHelper.MapNetDataType(arg.DATA_TYPE);
 
-          string nullable = (dataType != "string") ? "?" : "";
-          string? defaultString = dataType == "string" ? " = default!;" : null;
+          string nullable = DetermineNullable("YES", dataType, false); // (dataType != "string") ? "?" : "";
+          string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
           pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)} {{ get; set; }}{defaultString}");
         });
         pocoCode.AppendLine("}"); // end of: Reslt Column 
@@ -385,7 +418,7 @@ class MainCommand
             ? $"List<{arg.DATA_TYPE}>"
             : DBHelper.MapNetDataType(arg.DATA_TYPE);
 
-          string nullable = (dataType != "string") ? "?" : "";
+          string nullable = DetermineNullable("YES", dataType, false); // (dataType != "string") ? "?" : "";
           pocoCode.Append($", {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)}");
         });
 
@@ -447,7 +480,7 @@ class MainCommand
         bool isPrimaryKey = false;
         bool isIdentity = col.IS_IDENTITY == "YES";
         bool isComputed = false;
-        string nullable = (dataType != "string" && !isPrimaryKey) ? "?" : ""; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
+        string nullable = DetermineNullable("YES", dataType, isPrimaryKey); // (dataType != "string" && !isPrimaryKey) ? "?" : ""; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
 
         //# Key & Computed attribute
         if (isPrimaryKey)
@@ -462,7 +495,7 @@ class MainCommand
           pocoCode.AppendLine($"{_indent}[Required]");
 
         //# filed
-        string? defaultString = dataType == "string" ? " = default!;" : null;
+        string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
         pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
       });
 
@@ -515,7 +548,7 @@ class MainCommand
   /// <summary>
   /// 先只考慮有參數且有結果欄位的狀況。
   /// </summary>
-  void GenerateTableValuedFunctionPocoCode(SqlConnection conn, DirectoryInfo outDir) 
+  void GenerateTableValuedFunctionPocoCode(SqlConnection conn, DirectoryInfo outDir)
   {
     Console.WriteLine("================================================================================");
     Console.WriteLine($"#BEGIN {nameof(GenerateTableValuedFunctionPocoCode)}");
@@ -545,8 +578,8 @@ class MainCommand
       proc.ColumnList.ForEach(col =>
       {
         string dataType = DBHelper.MapNetDataType(col.DATA_TYPE);
-        string nullable = (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
-        string? defaultString = dataType == "string" ? " = default!;" : null;
+        string nullable = DetermineNullable(col.IS_NULLABLE, dataType, false); // (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
+        string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
 
         pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
       });
@@ -564,8 +597,8 @@ class MainCommand
       proc.ParamList.ForEach(arg =>
       {
         string dataType = DBHelper.MapNetDataType(arg.DATA_TYPE);
-        string nullable = (dataType != "string") ? "?" : "";
-        string? defaultString = dataType == "string" ? " = default!;" : null;
+        string nullable = DetermineNullable("YES", dataType, false); // (dataType != "string") ? "?" : "";
+        string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
 
         pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)} {{ get; set; }}{defaultString}");
       });
@@ -612,7 +645,7 @@ class MainCommand
       proc.ParamList.ForEach(arg =>
       {
         string dataType = DBHelper.MapNetDataType(arg.DATA_TYPE);
-        string nullable = (dataType != "string") ? "?" : "";
+        string nullable = DetermineNullable("YES", dataType, false); // (dataType != "string") ? "?" : "";
 
         pocoCode.Append($", {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)}");
       });
@@ -730,5 +763,29 @@ class MainCommand
     workbook.SaveAs(fi.FullName);
 
     Console.WriteLine("已匯出 Excel。");
+  }
+
+  /// <summary>
+  /// ※ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
+  /// </summary>
+  /// <returns></returns>
+  string DetermineNullable(string IS_NULLABLE, string dataType, bool isPrimaryKey)
+  {
+    // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
+    string nullable = IS_NULLABLE == "YES" ? "?" : string.Empty;
+
+    // `string` 本身就俱 null 特性。加不加`?`符號都一樣。
+    if (dataType == "string") return string.Empty;
+
+    // P-Key 一定有值。
+    if (isPrimaryKey) return string.Empty;
+
+    // 基於 C# 7.3 語言限制
+    if(_cs73Limit)
+    {
+      if (dataType == "Byte[]") return string.Empty; // 不支援`Byte[]?`語法。
+    }
+
+    return nullable;
   }
 }

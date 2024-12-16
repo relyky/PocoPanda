@@ -25,6 +25,7 @@ class DBHelper
       "float" => "Double",
       "int" => "int",
       "money" => "Decimal",
+      "smallmoney" => "Decimal",
       //case "nchar(50)":
       string t when t.StartsWith("nchar") => "string",
       "numeric" => "Decimal",
@@ -39,7 +40,7 @@ class DBHelper
       //case "varchar(50)":
       string t when t.StartsWith("varchar") => "string",
       "smalldatetime" => "DateTime",
-      "image" => "byte[]",
+      "image" => "Byte[]",
       "uniqueidentifier" => "Guid",
       "datetimeoffset" => "DateTimeOffset",
       "date" => "DateTime",
@@ -62,7 +63,11 @@ inner join sys.extended_properties sep on
   sep.name = 'MS_Description' and 
   sep.value is not null
 )
-SELECT T.*, MSDESC.[MS_Description]
+SELECT T.TABLE_CATALOG
+,T.TABLE_SCHEMA
+,[TABLE_NAME] = RTRIM(T.TABLE_NAME)
+,T.TABLE_TYPE
+,MSDESC.[MS_Description]
  FROM INFORMATION_SCHEMA.TABLES T
  LEFT JOIN MSDESC ON T.TABLE_SCHEMA = MSDESC.TABLE_SCHEMA AND T.TABLE_NAME = MSDESC.TABLE_NAME
  WHERE T.TABLE_NAME != 'sysdiagrams'
