@@ -150,9 +150,11 @@ class MainCommand
         string dataType = DBHelper.MapNetDataType(col.DATA_TYPE);
         bool isPrimaryKey = col.IS_PK == "YES";
         bool isIdentity = col.IS_IDENTITY == "YES";
-        bool isComputed = col.IS_COMPUTED == "YES";
         string nullable = DetermineNullable("YES", dataType, isPrimaryKey); // (dataType != "string" && !isPrimaryKey) ? "?" : string.Empty; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
         string description = col.MS_Description ?? string.Empty;
+
+        //# isComputed: rowversion/timestamp 也算是 computed 欄位。
+        bool isComputed = col.IS_COMPUTED == "YES" || col.DATA_TYPE == "timestamp" || col.DATA_TYPE == "rowversion"; 
 
         //# summary
         if (col.MS_Description != null || col.COMPUTED_DEFINITION != null)

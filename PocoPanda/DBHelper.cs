@@ -47,6 +47,8 @@ class DBHelper
       "datetimeoffset" => "DateTimeOffset",
       "date" => "DateTime",
       "time" => "TimeSpan",
+      "timestamp" => "UInt64",  // SQL Server 的 rowversion 與 timestamp 是同義字。
+      "rowversion" => "UInt64", // SQL Server 的 rowversion 與 timestamp 是同義字。 
       _ => $"{sqlDataTypeName}:not_support" // not support
     };
   }
