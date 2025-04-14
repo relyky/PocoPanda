@@ -151,8 +151,10 @@ class MainCommand
         bool isPrimaryKey = col.IS_PK == "YES";
         bool isIdentity = col.IS_IDENTITY == "YES";
         bool isComputed = col.IS_COMPUTED == "YES";
-        string nullable = DetermineNullable("YES", dataType, isPrimaryKey); // (dataType != "string" && !isPrimaryKey) ? "?" : string.Empty; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
+        bool isRowVersion = col.DATA_TYPE == "timestamp" || col.DATA_TYPE == "rowversion";
         string description = col.MS_Description ?? string.Empty;
+
+        string nullable = DetermineNullable("YES", dataType, isPrimaryKey, isRowVersion); // (dataType != "string" && !isPrimaryKey) ? "?" : string.Empty; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
 
         //# summary
         if (col.MS_Description != null || col.COMPUTED_DEFINITION != null)
@@ -177,7 +179,7 @@ class MainCommand
           pocoCode.AppendLine($"{_indent}[Key]");
         if (isIdentity)
           pocoCode.AppendLine($"{_indent}[DatabaseGenerated(DatabaseGeneratedOption.Identity)]");
-        if (isComputed)
+        if (isComputed || isRowVersion) // isRowVersion 也算是 Computed 因為它會自動產生。
           pocoCode.AppendLine($"{_indent}[DatabaseGenerated(DatabaseGeneratedOption.Computed)]");
 
         //# Required attribute
@@ -271,7 +273,7 @@ class MainCommand
         proc.ColumnList.ForEach(col =>
         {
           string dataType = DBHelper.MapNetDataType(col.DATA_TYPE);
-          string nullable = DetermineNullable(col.IS_NULLABLE, dataType, false); // (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
+          string nullable = DetermineNullable(col.IS_NULLABLE, dataType, false, false); // (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
           string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
 
           pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
@@ -296,7 +298,7 @@ class MainCommand
             ? $"List<{arg.DATA_TYPE}>"
             : DBHelper.MapNetDataType(arg.DATA_TYPE);
 
-          string nullable = DetermineNullable("YES", dataType, false); // (dataType != "string") ? "?" : "";
+          string nullable = DetermineNullable("YES", dataType, false, false); // (dataType != "string") ? "?" : "";
           string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
           pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)} {{ get; set; }}{defaultString}");
         });
@@ -425,7 +427,7 @@ class MainCommand
             ? $"List<{arg.DATA_TYPE}>"
             : DBHelper.MapNetDataType(arg.DATA_TYPE);
 
-          string nullable = DetermineNullable("YES", dataType, false); // (dataType != "string") ? "?" : "";
+          string nullable = DetermineNullable("YES", dataType, false, false); // (dataType != "string") ? "?" : "";
           pocoCode.Append($", {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)}");
         });
 
@@ -487,7 +489,7 @@ class MainCommand
         bool isPrimaryKey = false;
         bool isIdentity = col.IS_IDENTITY == "YES";
         bool isComputed = false;
-        string nullable = DetermineNullable("YES", dataType, isPrimaryKey); // (dataType != "string" && !isPrimaryKey) ? "?" : ""; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
+        string nullable = DetermineNullable("YES", dataType, isPrimaryKey, false); // (dataType != "string" && !isPrimaryKey) ? "?" : ""; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
 
         //# Key & Computed attribute
         if (isPrimaryKey)
@@ -585,7 +587,7 @@ class MainCommand
       proc.ColumnList.ForEach(col =>
       {
         string dataType = DBHelper.MapNetDataType(col.DATA_TYPE);
-        string nullable = DetermineNullable(col.IS_NULLABLE, dataType, false); // (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
+        string nullable = DetermineNullable(col.IS_NULLABLE, dataType, false, false); // (dataType != "string" && col.IS_NULLABLE == "YES") ? "?" : "";
         string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
 
         pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {col.COLUMN_NAME} {{ get; set; }}{defaultString}");
@@ -604,7 +606,7 @@ class MainCommand
       proc.ParamList.ForEach(arg =>
       {
         string dataType = DBHelper.MapNetDataType(arg.DATA_TYPE);
-        string nullable = DetermineNullable("YES", dataType, false); // (dataType != "string") ? "?" : "";
+        string nullable = DetermineNullable("YES", dataType, false, false); // (dataType != "string") ? "?" : "";
         string? defaultString = (dataType == "string" && _fieldWithDefault) ? " = default!;" : null;
 
         pocoCode.AppendLine($"{_indent}public {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)} {{ get; set; }}{defaultString}");
@@ -652,7 +654,7 @@ class MainCommand
       proc.ParamList.ForEach(arg =>
       {
         string dataType = DBHelper.MapNetDataType(arg.DATA_TYPE);
-        string nullable = DetermineNullable("YES", dataType, false); // (dataType != "string") ? "?" : "";
+        string nullable = DetermineNullable("YES", dataType, false, false); // (dataType != "string") ? "?" : "";
 
         pocoCode.Append($", {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)}");
       });
@@ -781,7 +783,7 @@ class MainCommand
   /// ※ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
   /// </summary>
   /// <returns></returns>
-  string DetermineNullable(string IS_NULLABLE, string dataType, bool isPrimaryKey)
+  string DetermineNullable(string IS_NULLABLE, string dataType, bool isPrimaryKey, bool isRowVersion)
   {
     // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
     string nullable = IS_NULLABLE == "YES" ? "?" : string.Empty;
@@ -790,7 +792,7 @@ class MainCommand
     if (dataType == "string") return string.Empty;
 
     // P-Key 一定有值。
-    if (isPrimaryKey) return string.Empty;
+    if (isPrimaryKey || isRowVersion) return string.Empty;
 
     // 基於 C# 7.3 語言限制
     if (_cs73Limit)

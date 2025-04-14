@@ -47,6 +47,8 @@ class DBHelper
       "datetimeoffset" => "DateTimeOffset",
       "date" => "DateTime",
       "time" => "TimeSpan",
+      "timestamp" => "Byte[]",   // byte[8], SQL Server 的 rowversion 與 timestamp 是同義字。
+      "rowversion" => "Byte[]",  // byte[8], SQL Server 的 rowversion 與 timestamp 是同義字。 
       _ => $"{sqlDataTypeName}:not_support" // not support
     };
   }

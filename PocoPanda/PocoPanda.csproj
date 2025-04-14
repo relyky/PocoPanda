@@ -5,7 +5,7 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <VersionPrefix>1.2.0</VersionPrefix>
+    <VersionPrefix>1.2.2</VersionPrefix>
     <VersionSuffix>beta</VersionSuffix>
     <PackageLicenseExpression>CC-BY-NC-SA-4.0</PackageLicenseExpression>
     <PublishAot>false</PublishAot>
