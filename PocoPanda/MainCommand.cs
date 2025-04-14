@@ -3,6 +3,7 @@ using ClosedXML.Report;
 using Cocona;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using MoreLinq;
 using PocoPanda.Models;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
@@ -37,6 +38,11 @@ class MainCommand
   readonly bool _fieldWithDefault;
 
   /// <summary>
+  /// 欄位的 annotation 禁止加入[Required]標註。
+  /// </summary>
+  readonly bool _fieldNoRequired;
+
+  /// <summary>
   /// .NET Framework 4.8 只支援到 C# 7.3 版的語言限制。
   /// </summary>
   readonly bool _cs73Limit;
@@ -52,6 +58,7 @@ class MainCommand
     _sqlClientLibrary = config.GetValue<string>("SqlClientLibrary", "Microsoft.Data.SqlClient");
     _nameInfo = config.GetValue<bool>("NameInfo", false);
     _fieldWithDefault = config.GetValue<bool>("FieldWithDefault", true);
+    _fieldNoRequired = config.GetValue<bool>("FieldNoRequired", false);
     _cs73Limit = config.GetValue<bool>("CS73Limit", false);
   }
 
@@ -85,7 +92,7 @@ class MainCommand
       GenerateTableValuedFunctionPocoCode(conn, outDir);
       GenerateTableTypePocoCode(conn, outDir);
 
-      if (_exportExcel) 
+      if (_exportExcel)
         GenerateTableToExcel(conn, outDir);
 
       Console.WriteLine();
@@ -107,7 +114,7 @@ class MainCommand
   {
     Console.WriteLine("================================================================================");
     Console.WriteLine($"#BEGIN {nameof(GenerateTablePocoCode)}");
-    var tableList = DBHelper.LoadTable(conn); 
+    var tableList = DBHelper.LoadTable(conn);
     tableList.ForEach(table =>
     {
       Console.WriteLine("--------------------------------------------------------------------------------");
@@ -122,7 +129,7 @@ class MainCommand
       pocoCode.AppendLine();
 
       //# summary 
-      if(table.MS_Description != null)
+      if (table.MS_Description != null)
       {
         pocoCode.AppendLine($"/// <summary>");
         pocoCode.AppendLine($"/// {table.MS_Description}");
@@ -174,7 +181,7 @@ class MainCommand
           pocoCode.AppendLine($"{_indent}[DatabaseGenerated(DatabaseGeneratedOption.Computed)]");
 
         //# Required attribute
-        if (col.IS_NULLABLE == "NO")
+        if (col.IS_NULLABLE == "NO" && !_fieldNoRequired)
           pocoCode.AppendLine($"{_indent}[Required]");
 
         //# filed
@@ -247,7 +254,7 @@ class MainCommand
       pocoCode.AppendLine("using System;");
       pocoCode.AppendLine("using System.Collections.Generic;");
       pocoCode.AppendLine("using Dapper;");
-      pocoCode.AppendLine("using Vista.DbPanda;");
+      //pocoCode.AppendLine("using Vista.DbPanda;");
       pocoCode.AppendLine($"using {_sqlClientLibrary};");
       pocoCode.AppendLine();
 
@@ -314,16 +321,16 @@ class MainCommand
       if (f_NonParam)
       {
         if (f_NonResult) // 無參數無結果
-          pocoCode.AppendLine($"public static int Call{proc.SPECIFIC_NAME}(this SqlConnection conn, SqlTransaction? txn = null)");
+          pocoCode.AppendLine($"public static int Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {SqlTransaction_txn})");
         else // 無參數無結果
-          pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, SqlTransaction? txn = null)");
+          pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {SqlTransaction_txn})");
       }
       else
       {
         if (f_NonResult) // 有參數無結果
-          pocoCode.AppendLine($"public static int Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, SqlTransaction? txn = null)");
+          pocoCode.AppendLine($"public static int Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, {SqlTransaction_txn})");
         else // 有參數有結果
-          pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, SqlTransaction? txn = null)");
+          pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, {SqlTransaction_txn})");
       }
 
       pocoCode.AppendLine("{"); // begin of: call procedure 
@@ -423,7 +430,7 @@ class MainCommand
         });
 
         // 加入交易
-        pocoCode.AppendLine(", SqlTransaction? txn = null)");
+        pocoCode.AppendLine($", {SqlTransaction_txn})");
         pocoCode.AppendLine("{"); // begin of: call procedure 
 
         pocoCode.AppendLine($"{_indent}var args = new {proc.SPECIFIC_NAME}Args {{");
@@ -618,7 +625,7 @@ class MainCommand
       ///    return dataList;
       ///}
 
-      pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, SqlTransaction? txn = null)");
+      pocoCode.AppendLine($"public static List<{proc.SPECIFIC_NAME}Result> Call{proc.SPECIFIC_NAME}(this SqlConnection conn, {proc.SPECIFIC_NAME}Args args, {SqlTransaction_txn})");
       pocoCode.AppendLine("{");
 
       pocoCode.Append($"{_indent}var sql = @\"SELECT * FROM [{proc.SPECIFIC_SCHEMA}].[{proc.SPECIFIC_NAME}](");
@@ -649,7 +656,7 @@ class MainCommand
 
         pocoCode.Append($", {dataType}{nullable} {arg.PARAMETER_NAME.Substring(1)}");
       });
-      pocoCode.AppendLine(", SqlTransaction? txn = null)");
+      pocoCode.AppendLine($", {SqlTransaction_txn})");
       pocoCode.AppendLine("{");
       pocoCode.AppendLine($"{_indent}var args = new {{");
       proc.ParamList.ForEach(arg =>
@@ -684,7 +691,9 @@ class MainCommand
     // 以 Excel 範本為基礎
     using var workbook = new XLWorkbook(@"Template/Template_Overview.xlsx");
 
-    var tableList = DBHelper.LoadTable(conn);
+    var tableList = (from t in DBHelper.LoadTable(conn)
+                     orderby t.TABLE_TYPE, t.TABLE_CATALOG, t.TABLE_SCHEMA, t.TABLE_NAME
+                     select t).ToList();
 
     #region 資料庫檔案(物件)總覽
 
@@ -712,8 +721,11 @@ class MainCommand
     #endregion 資料庫檔案(物件)總覽
 
     #region 一一加入資料庫檔案(物件)明細
+    int counter = 0;
     tableList.ForEach(table =>
     {
+      Console.WriteLine($"存入Excel進度 {++counter}/{tableList.Count}: {table.TABLE_NAME} ");
+
       //## 一個 Table 一個 sheet
       List<ColumnInfo> columnList = DBHelper.LoadTableColumn(conn, table.TABLE_NAME);
 
@@ -749,7 +761,7 @@ class MainCommand
     var lastRowNum = overSheet.LastRowUsed().RowNumber();
 
     var activeRow = overSheet.Row(6);
-    while(lastRowNum >= activeRow.RowNumber())
+    while (lastRowNum >= activeRow.RowNumber())
     {
       var link = activeRow.Cell(2).CreateHyperlink();
       link.InternalAddress = $"{activeRow.Cell(2).Value}!A1"; // 連結到自己的明細
@@ -781,11 +793,13 @@ class MainCommand
     if (isPrimaryKey) return string.Empty;
 
     // 基於 C# 7.3 語言限制
-    if(_cs73Limit)
+    if (_cs73Limit)
     {
       if (dataType == "Byte[]") return string.Empty; // 不支援`Byte[]?`語法。
     }
 
     return nullable;
   }
+
+  string SqlTransaction_txn => _cs73Limit ? "SqlTransaction txn = null" : "SqlTransaction? txn = null";
 }

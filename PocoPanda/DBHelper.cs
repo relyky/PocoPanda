@@ -1,5 +1,6 @@
 ﻿using Dapper;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Hosting;
 
 namespace PocoPanda;
 
@@ -28,7 +29,8 @@ class DBHelper
       "smallmoney" => "Decimal",
       //case "nchar(50)":
       string t when t.StartsWith("nchar") => "string",
-      "numeric" => "Decimal",
+      //"numeric(18,0)" => "Decimal",
+      string t when t.StartsWith("numeric") => "Decimal",
       //case "nvarchar(50)":
       string t when t.StartsWith("nvarchar") => "string",
       "real" => "single",
@@ -134,10 +136,12 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION ASC ";
 
   public static List<RoutineInfo> LoadProcedure(SqlConnection conn)
   {
-    string sql1 = @"SELECT SPECIFIC_CATALOG, SPECIFIC_SCHEMA, SPECIFIC_NAME, ROUTINE_TYPE
+    string sql1 = """
+SELECT SPECIFIC_CATALOG, SPECIFIC_SCHEMA, SPECIFIC_NAME, ROUTINE_TYPE
   FROM INFORMATION_SCHEMA.ROUTINES
  WHERE ROUTINE_TYPE = 'PROCEDURE'
-   AND ROUTINE_NAME NOT IN('sp_upgraddiagrams','sp_helpdiagrams','sp_helpdiagramdefinition','sp_creatediagram','sp_renamediagram','sp_alterdiagram','sp_dropdiagram'); ";
+   AND ROUTINE_NAME NOT IN('sp_upgraddiagrams','sp_helpdiagrams','sp_helpdiagramdefinition','sp_creatediagram','sp_renamediagram','sp_alterdiagram','sp_dropdiagram'); 
+""";
 
     List<RoutineInfo> procedureList = new List<RoutineInfo>();
     foreach (var info in conn.Query<RoutineInfo>(sql1).ToList())
@@ -146,14 +150,21 @@ ORDER BY TABLE_NAME, ORDINAL_POSITION ASC ";
       info.ParamList = DoLoadParameterInfo(conn, info.SPECIFIC_NAME, info.SPECIFIC_SCHEMA, info.SPECIFIC_CATALOG);
 
       // result column info
-      info.ColumnList = conn.Query("sp_describe_first_result_set", new { tsql = info.SPECIFIC_NAME },
-          commandType: System.Data.CommandType.StoredProcedure).Select(c => new RoutineColumnInfo
-          {
-            COLUMN_NAME = (string)c.name,
-            ORDINAL_POSITION = (int)c.column_ordinal,
-            IS_NULLABLE = (bool)c.is_nullable ? "YES" : "NO",
-            DATA_TYPE = (string)c.system_type_name
-          }).ToList();
+      try
+      {
+        info.ColumnList = conn.Query("sp_describe_first_result_set", new { tsql = info.SPECIFIC_NAME },
+            commandType: System.Data.CommandType.StoredProcedure).Select(c => new RoutineColumnInfo
+            {
+              COLUMN_NAME = (string)c.name,
+              ORDINAL_POSITION = (int)c.column_ordinal,
+              IS_NULLABLE = (bool)c.is_nullable ? "YES" : "NO",
+              DATA_TYPE = (string)c.system_type_name
+            }).ToList();
+      }
+      catch (Exception ex) {
+        Console.WriteLine($"取不到 Procedure [{info.SPECIFIC_NAME}] 的 result_set 結構 => 視同沒有。");
+        info.ColumnList = new List<RoutineColumnInfo>();
+      }
 
       procedureList.Add(info);
     }
