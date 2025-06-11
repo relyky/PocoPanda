@@ -155,7 +155,7 @@ class MainCommand
         string description = col.MS_Description ?? string.Empty;
 
         string nullable = DetermineNullable("YES", dataType, isPrimaryKey, isRowVersion); // (dataType != "string" && !isPrimaryKey) ? "?" : string.Empty; // ORM 欄位原則上都是 nullable 不然在 input binding 會很難實作。
-
+		
         //# summary
         if (col.MS_Description != null || col.COMPUTED_DEFINITION != null)
         {
